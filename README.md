@@ -1,4 +1,4 @@
-# Dynamic-Traffic-Light-Controller
+# Dynamic-Traffic-Light-Controller     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
 Overview:
 The Dynamic Traffic Light Controller is a cutting-edge system designed to optimize traffic flow at intersections. Utilizing the power of Python and the Apache 2 license, this solution employs live camera feeds to analyze traffic density in real-time. By integrating YOLO object detection technology, it accurately counts vehicles at traffic junctions, allowing for dynamic adjustment of traffic signal durations. This innovative approach aims to significantly reduce road congestion, expedite travel times, and lower fuel consumption.
 
