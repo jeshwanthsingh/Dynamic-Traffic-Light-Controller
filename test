@@ -1,0 +1,91 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include "assignment2.h"
+
+#define MESSAGE_LENGTH 100
+
+int main(int argc, char* argv[]) {
+    if (argc < 4) {
+        printf("Usage: %s <firstName> <lastName> <message>\n", argv[0]);
+        return 1;
+    }
+
+    // Allocate and populate personalInfo structure
+    personalInfo* pInfo = (personalInfo*)malloc(sizeof(personalInfo));
+    if (pInfo == NULL) {
+        printf("Memory allocation failed!\n");
+        return 1;
+    }
+
+    // Use strdup to handle first and last names
+    pInfo->firstName = strdup(argv[1]);
+    pInfo->lastName = strdup(argv[2]);
+    printf("First Name: %s\n", pInfo->firstName);
+    printf("Last Name: %s\n", pInfo->lastName);
+
+    pInfo->studentID = 923812276;
+    pInfo->level = SENIOR;
+    pInfo->languages = KNOWLEDGE_OF_C | KNOWLEDGE_OF_JAVA | KNOWLEDGE_OF_CPLUSPLUS;
+
+    // Handle message with null termination
+    strncpy(pInfo->message, argv[3], MESSAGE_LENGTH - 1);
+    pInfo->message[MESSAGE_LENGTH - 1] = '\0';
+
+    // Write personal info
+    if (writePersonalInfo(pInfo) != 0) {
+        printf("Error: writePersonalInfo\n");
+    }
+
+    // Free personalInfo memory
+    free(pInfo->firstName);
+    free(pInfo->lastName);
+    free(pInfo);
+
+    // Allocate memory for buffer
+    char* buffer = (char*)malloc(BLOCK_SIZE);
+    if (buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        return 1;
+    }
+    int usedBufferSize = 0;
+
+    // Get strings and handle buffer
+    while (true) {
+        const char* newString = getNext();
+        if (newString == NULL) {
+            // Commit remaining buffer if not empty
+            if (usedBufferSize > 0) {
+                commitBlock(buffer);
+            }
+            break;
+        }
+
+        int stringLen = strlen(newString);
+
+        // Check if the string fits into the buffer
+        if (usedBufferSize + stringLen > BLOCK_SIZE) {
+            int spaceLeft = BLOCK_SIZE - usedBufferSize;
+            memcpy(buffer + usedBufferSize, newString, spaceLeft);
+
+            // Commit the block
+            commitBlock(buffer);
+            usedBufferSize = 0;
+
+            // Copy the remaining part of the string into the new buffer
+            memcpy(buffer, newString + spaceLeft, stringLen - spaceLeft);
+            usedBufferSize = stringLen - spaceLeft;
+        } else {
+            // Copy the string into the buffer
+            memcpy(buffer + usedBufferSize, newString, stringLen);
+            usedBufferSize += stringLen;
+        }
+    }
+
+    // Free buffer memory
+    free(buffer);
+
+    // Check results
+    return checkIt();
+}
