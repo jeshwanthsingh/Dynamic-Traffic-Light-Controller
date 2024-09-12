@@ -124,3 +124,93 @@ while (true) {
 
 // Free the buffer memory and commit any remaining data
 free(buffer);
+
+
+
+
+------------------------
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include "assignment2.h"
+
+// Define message length
+#define MESSAGE_LENGTH 100
+
+int main(int argc, char* argv[]) {
+    // Check if the number of arguments is correct
+    if (argc < 4) {
+        printf("Usage: %s <firstName> <lastName> <message>\n", argv[0]);
+        return 1;
+    }
+
+    // Allocate memory for personalInfo
+    personalInfo* pi = (personalInfo*)malloc(sizeof(personalInfo));
+
+    // Copy first name and last name
+    pi->firstName = strdup(argv[1]);
+    pi->lastName = strdup(argv[2]);
+    
+    // Set student ID, level and languages
+    pi->studentID = 922265081;
+    pi->level = SENIOR;
+    pi->languages = KNOWLEDGE_OF_C | KNOWLEDGE_OF_JAVA | KNOWLEDGE_OF_JAVASCRIPT | KNOWLEDGE_OF_SQL;
+
+    // Copy message
+    strncpy(pi->message, argv[3], sizeof(pi->message) -1);
+    pi->message[sizeof(pi->message) - 1] = '\0';
+
+    // Write personal info
+    writePersonalInfo(pi);
+
+    // Allocate memory for buffer
+    char* buffer = (char*)malloc(BLOCK_SIZE);
+   
+    // Initialize buffer
+    int usedBufferSize = 0;
+
+    // Get strings and handle buffer
+    while (true) {
+        const char* newString = getNext();
+        if (newString == NULL) {
+            // Commit remaining buffer if not empty
+            if (usedBufferSize > 0) {
+                commitBlock(buffer);
+            }
+            break;
+        }
+
+        // Get string length    
+        int stringLen = strlen(newString);
+
+        // Check if the string fits into the buffer
+        if (usedBufferSize + stringLen > BLOCK_SIZE) {
+            int spaceLeft = BLOCK_SIZE - usedBufferSize;
+            memcpy(buffer + usedBufferSize, newString, spaceLeft);
+
+            // Commit the block
+            commitBlock(buffer);
+            usedBufferSize = 0;
+
+            // Copy the remaining part of the string into the new buffer
+            memcpy(buffer, newString + spaceLeft, stringLen - spaceLeft);
+            usedBufferSize = stringLen - spaceLeft;
+        } else {
+            // Copy the string into the buffer
+            memcpy(buffer + usedBufferSize, newString, stringLen);
+            usedBufferSize += stringLen;
+        }
+    }
+
+    // Free buffer memory
+    free(buffer);
+    // Free personalInfo memory
+    free(pi);
+
+    // Check if the personal info was written correctly
+    return checkIt();
+}
