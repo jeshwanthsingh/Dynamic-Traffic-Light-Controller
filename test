@@ -89,3 +89,38 @@ int main(int argc, char* argv[]) {
     // Check results
     return checkIt();
 }
+
+
+
+
+---------------
+
+
+
+
+// Get strings and handle buffer
+while (true) {
+    const char* newString = getNext();
+    if (newString == NULL) {
+        // If there's any remaining data in the buffer, commit it
+        if (usedBufferSize > 0) {
+            commitBlock(buffer);
+        }
+        break; // Exit the loop when there are no more strings
+    }
+
+    int stringLen = strlen(newString);
+
+    // If the string doesn't fit in the remaining buffer space, commit the buffer
+    if (usedBufferSize + stringLen > BLOCK_SIZE) {
+        commitBlock(buffer); // Commit the full buffer
+        usedBufferSize = 0;  // Reset the buffer usage
+    }
+
+    // Copy the string into the buffer
+    memcpy(buffer + usedBufferSize, newString, stringLen);
+    usedBufferSize += stringLen; // Update the buffer usage
+}
+
+// Free the buffer memory and commit any remaining data
+free(buffer);
