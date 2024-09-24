@@ -1,216 +1,131 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include "assignment2.h"
-
-#define MESSAGE_LENGTH 100
-
-int main(int argc, char* argv[]) {
-    if (argc < 4) {
-        printf("Usage: %s <firstName> <lastName> <message>\n", argv[0]);
-        return 1;
-    }
-
-    // Allocate and populate personalInfo structure
-    personalInfo* pInfo = (personalInfo*)malloc(sizeof(personalInfo));
-    if (pInfo == NULL) {
-        printf("Memory allocation failed!\n");
-        return 1;
-    }
-
-    // Use strdup to handle first and last names
-    pInfo->firstName = strdup(argv[1]);
-    pInfo->lastName = strdup(argv[2]);
-    printf("First Name: %s\n", pInfo->firstName);
-    printf("Last Name: %s\n", pInfo->lastName);
-
-    pInfo->studentID = 923812276;
-    pInfo->level = SENIOR;
-    pInfo->languages = KNOWLEDGE_OF_C | KNOWLEDGE_OF_JAVA | KNOWLEDGE_OF_CPLUSPLUS;
-
-    // Handle message with null termination
-    strncpy(pInfo->message, argv[3], MESSAGE_LENGTH - 1);
-    pInfo->message[MESSAGE_LENGTH - 1] = '\0';
-
-    // Write personal info
-    if (writePersonalInfo(pInfo) != 0) {
-        printf("Error: writePersonalInfo\n");
-    }
-
-    // Free personalInfo memory
-    free(pInfo->firstName);
-    free(pInfo->lastName);
-    free(pInfo);
-
-    // Allocate memory for buffer
-    char* buffer = (char*)malloc(BLOCK_SIZE);
-    if (buffer == NULL) {
-        printf("Memory allocation failed!\n");
-        return 1;
-    }
-    int usedBufferSize = 0;
-
-    // Get strings and handle buffer
-    while (true) {
-        const char* newString = getNext();
-        if (newString == NULL) {
-            // Commit remaining buffer if not empty
-            if (usedBufferSize > 0) {
-                commitBlock(buffer);
-            }
-            break;
-        }
-
-        int stringLen = strlen(newString);
-
-        // Check if the string fits into the buffer
-        if (usedBufferSize + stringLen > BLOCK_SIZE) {
-            int spaceLeft = BLOCK_SIZE - usedBufferSize;
-            memcpy(buffer + usedBufferSize, newString, spaceLeft);
-
-            // Commit the block
-            commitBlock(buffer);
-            usedBufferSize = 0;
-
-            // Copy the remaining part of the string into the new buffer
-            memcpy(buffer, newString + spaceLeft, stringLen - spaceLeft);
-            usedBufferSize = stringLen - spaceLeft;
-        } else {
-            // Copy the string into the buffer
-            memcpy(buffer + usedBufferSize, newString, stringLen);
-            usedBufferSize += stringLen;
-        }
-    }
-
-    // Free buffer memory
-    free(buffer);
-
-    // Check results
-    return checkIt();
-}
-
-
-
-
----------------
-
-
-
-
-// Get strings and handle buffer
-while (true) {
-    const char* newString = getNext();
-    if (newString == NULL) {
-        // If there's any remaining data in the buffer, commit it
-        if (usedBufferSize > 0) {
-            commitBlock(buffer);
-        }
-        break; // Exit the loop when there are no more strings
-    }
-
-    int stringLen = strlen(newString);
-
-    // If the string doesn't fit in the remaining buffer space, commit the buffer
-    if (usedBufferSize + stringLen > BLOCK_SIZE) {
-        commitBlock(buffer); // Commit the full buffer
-        usedBufferSize = 0;  // Reset the buffer usage
-    }
-
-    // Copy the string into the buffer
-    memcpy(buffer + usedBufferSize, newString, stringLen);
-    usedBufferSize += stringLen; // Update the buffer usage
-}
-
-// Free the buffer memory and commit any remaining data
-free(buffer);
-
-
-
-
-------------------------
-
-
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #include <string.h>
-#include <stdbool.h>
-#include "assignment2.h"
 
-// Define message length
-#define MESSAGE_LENGTH 100
+#define BUFFER_SIZE 177
+#define READEND 0
+#define WRITEEND 1
 
 int main(int argc, char* argv[]) {
-    // Check if the number of arguments is correct
-    if (argc < 4) {
-        printf("Usage: %s <firstName> <lastName> <message>\n", argv[0]);
-        return 1;
+    char *prompt = "> ";  // Default prompt
+
+    // If a custom prompt is provided, use it
+    if (argc > 1) {
+        prompt = argv[1];
     }
 
-    // Allocate memory for personalInfo
-    personalInfo* pi = (personalInfo*)malloc(sizeof(personalInfo));
+    char line[BUFFER_SIZE];  // Store user input
+    char *commands[BUFFER_SIZE];  // Store individual commands separated by pipes
+    char *arguments[BUFFER_SIZE][BUFFER_SIZE];  // Store arguments for each command
+    int command_count;  // Number of commands parsed
 
-    // Copy first name and last name
-    pi->firstName = strdup(argv[1]);
-    pi->lastName = strdup(argv[2]);
-    
-    // Set student ID, level and languages
-    pi->studentID = 922265081;
-    pi->level = SENIOR;
-    pi->languages = KNOWLEDGE_OF_C | KNOWLEDGE_OF_JAVA | KNOWLEDGE_OF_JAVASCRIPT | KNOWLEDGE_OF_SQL;
+    while (1) {
+        printf("%s", prompt);  // Print prompt
+        fflush(stdout);
 
-    // Copy message
-    strncpy(pi->message, argv[3], sizeof(pi->message) -1);
-    pi->message[sizeof(pi->message) - 1] = '\0';
-
-    // Write personal info
-    writePersonalInfo(pi);
-
-    // Allocate memory for buffer
-    char* buffer = (char*)malloc(BLOCK_SIZE);
-   
-    // Initialize buffer
-    int usedBufferSize = 0;
-
-    // Get strings and handle buffer
-    while (true) {
-        const char* newString = getNext();
-        if (newString == NULL) {
-            // Commit remaining buffer if not empty
-            if (usedBufferSize > 0) {
-                commitBlock(buffer);
+        if (fgets(line, sizeof(line), stdin) == NULL) {
+            // Handle EOF (Ctrl-D)
+            if (feof(stdin)) {
+                printf("Exiting shell...\n");
+                break;
+            } else {
+                perror("Error reading input");
+                exit(1);
             }
+        }
+
+        // Handle empty lines
+        if (strcmp(line, "\n") == 0) {
+            printf("Error: Empty command. Please enter a command.\n");
+            continue;
+        }
+
+        // Handle exit command
+        if (strcmp(line, "exit\n") == 0) {
+            printf("Exiting shell...\n");
             break;
         }
 
-        // Get string length    
-        int stringLen = strlen(newString);
+        // Parse input commands separated by pipes
+        char *token;
+        int command_index = 0;
+        token = strtok(line, "|");
+        while (token != NULL) {
+            commands[command_index] = token;
+            token = strtok(NULL, "|");
+            command_index++;
+        }
+        command_count = command_index;  // Total number of commands
 
-        // Check if the string fits into the buffer
-        if (usedBufferSize + stringLen > BLOCK_SIZE) {
-            int spaceLeft = BLOCK_SIZE - usedBufferSize;
-            memcpy(buffer + usedBufferSize, newString, spaceLeft);
+        // Parse arguments for each command
+        for (int i = 0; i < command_count; i++) {
+            int arg_index = 0;
+            token = strtok(commands[i], " \t\n");  // Split by spaces or tabs
+            while (token != NULL) {
+                arguments[i][arg_index] = token;
+                token = strtok(NULL, " \t\n");
+                arg_index++;
+            }
+            arguments[i][arg_index] = NULL;  // Null-terminate the argument list
+        }
 
-            // Commit the block
-            commitBlock(buffer);
-            usedBufferSize = 0;
+        // Create pipes
+        int pipes[command_count - 1][2];
+        for (int i = 0; i < command_count - 1; i++) {
+            if (pipe(pipes[i]) == -1) {
+                perror("pipe");
+                exit(EXIT_FAILURE);
+            }
+        }
 
-            // Copy the remaining part of the string into the new buffer
-            memcpy(buffer, newString + spaceLeft, stringLen - spaceLeft);
-            usedBufferSize = stringLen - spaceLeft;
-        } else {
-            // Copy the string into the buffer
-            memcpy(buffer + usedBufferSize, newString, stringLen);
-            usedBufferSize += stringLen;
+        // Fork processes for each command
+        for (int i = 0; i < command_count; i++) {
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("fork");
+                exit(EXIT_FAILURE);
+            } else if (pid == 0) {
+                // Child process
+
+                // Redirect input/output for pipes
+                if (i > 0) {
+                    // If not the first command, get input from the previous pipe
+                    dup2(pipes[i - 1][READEND], STDIN_FILENO);
+                }
+                if (i < command_count - 1) {
+                    // If not the last command, send output to the next pipe
+                    dup2(pipes[i][WRITEEND], STDOUT_FILENO);
+                }
+
+                // Close all pipe ends
+                for (int j = 0; j < command_count - 1; j++) {
+                    close(pipes[j][READEND]);
+                    close(pipes[j][WRITEEND]);
+                }
+
+                // Execute the command
+                execvp(arguments[i][0], arguments[i]);
+                perror("execvp failed");
+                exit(EXIT_FAILURE);  // If execvp fails, exit child process
+            }
+        }
+
+        // Parent process closes pipes and waits for children to finish
+        for (int i = 0; i < command_count - 1; i++) {
+            close(pipes[i][READEND]);
+            close(pipes[i][WRITEEND]);
+        }
+
+        // Wait for all child processes to finish
+        for (int i = 0; i < command_count; i++) {
+            int status;
+            wait(&status);
+            printf("Child %d exited with status %d\n", i, WEXITSTATUS(status));
         }
     }
 
-    // Free buffer memory
-    free(buffer);
-    // Free personalInfo memory
-    free(pi);
-
-    // Check if the personal info was written correctly
-    return checkIt();
+    return 0;
 }
