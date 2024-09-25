@@ -129,3 +129,157 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
+
+
+
+
+----------------------------------------
+
+/**************************************************************
+* Class::  CSC-415-04 Spring 2024
+* Name:: Jeshwanth Singh
+* Student ID:: 922265081
+* GitHub-Name:: jeshwanthsingh
+* Project:: Assignment 3 – Simple Shell with Pipes
+*
+* File:: Singh_Jeshwanth_HW3_main.c
+*
+* Description::
+* This program is a simple shell that reads user commands 
+* and executes them. It supports multiple commands separated 
+* by pipes and forks child processes to handle each command.
+* The shell exits when "exit" is typed or when EOF is reached.
+**************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <string.h>
+
+#define BUFFER_SIZE 177  // Buffer size for user input
+#define READEND 0  // Read end of a pipe
+#define WRITEEND 1  // Write end of a pipe
+
+int main(int argc, char* argv[]) {
+    char *prompt = "> ";  // Default prompt if no custom prompt is provided
+
+    // Check if a custom prompt is provided, if so use it
+    if (argc > 1) {
+        prompt = argv[1];
+    }
+
+    char line[BUFFER_SIZE];  // Store user input here
+    char *commands[BUFFER_SIZE];  // Store commands separated by pipes
+    char *arguments[BUFFER_SIZE][BUFFER_SIZE];  // Store arguments for each command
+    int command_count;  // Store the number of commands
+
+    // Infinite loop to keep the shell running until user exits
+    while (1) {
+        printf("%s", prompt);  // Display the prompt
+        fflush(stdout);  // Ensure the prompt is printed before taking input
+
+        // Read user input, check for EOF (Ctrl-D)
+        if (fgets(line, sizeof(line), stdin) == NULL) {
+            if (feof(stdin)) {
+                printf("Exiting shell...\n");
+                break;  // Exit the loop and shell if EOF is detected
+            } else {
+                perror("Error reading input");
+                exit(1);  // Exit if there's a reading error
+            }
+        }
+
+        // Ignore empty input (just pressing Enter)
+        if (strcmp(line, "\n") == 0) {
+            printf("Error: Empty command. Please enter a command.\n");
+            continue;  // Prompt again if the input is empty
+        }
+
+        // Check if the user wants to exit
+        if (strcmp(line, "exit\n") == 0) {
+            printf("Exiting shell...\n");
+            break;  // Exit the shell when "exit" is typed
+        }
+
+        // Split input by the pipe symbol "|"
+        char *token;
+        int command_index = 0;
+        token = strtok(line, "|");
+        while (token != NULL) {
+            commands[command_index] = token;  // Store each command in the array
+            token = strtok(NULL, "|");
+            command_index++;  // Move to the next command
+        }
+        command_count = command_index;  // Store the total number of commands
+
+        // For each command, split it into arguments
+        for (int i = 0; i < command_count; i++) {
+            int arg_index = 0;
+            token = strtok(commands[i], " \t\n");  // Split by spaces or tabs
+            while (token != NULL) {
+                arguments[i][arg_index] = token;  // Store the argument
+                token = strtok(NULL, " \t\n");
+                arg_index++;
+            }
+            arguments[i][arg_index] = NULL;  // End argument list with NULL
+        }
+
+        // Create pipes for communication between commands
+        int pipes[command_count - 1][2];
+        for (int i = 0; i < command_count - 1; i++) {
+            if (pipe(pipes[i]) == -1) {
+                perror("pipe failed");  // If pipe creation fails
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        // For each command, create a child process using fork
+        for (int i = 0; i < command_count; i++) {
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("fork failed");  // Check for fork error
+                exit(EXIT_FAILURE);
+            } else if (pid == 0) {
+                // In the child process
+
+                // If not the first command, get input from the previous pipe
+                if (i > 0) {
+                    dup2(pipes[i - 1][READEND], STDIN_FILENO);
+                }
+
+                // If not the last command, send output to the next pipe
+                if (i < command_count - 1) {
+                    dup2(pipes[i][WRITEEND], STDOUT_FILENO);
+                }
+
+                // Close all pipe ends that are no longer needed
+                for (int j = 0; j < command_count - 1; j++) {
+                    close(pipes[j][READEND]);
+                    close(pipes[j][WRITEEND]);
+                }
+
+                // Execute the command
+                execvp(arguments[i][0], arguments[i]);
+                perror("execvp failed");  // Print error if exec fails
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        // In the parent process: close pipes and wait for all children
+        for (int i = 0; i < command_count - 1; i++) {
+            close(pipes[i][READEND]);  // Close all pipes in the parent
+            close(pipes[i][WRITEEND]);
+        }
+
+        // Wait for all child processes to finish
+        for (int i = 0; i < command_count; i++) {
+            int status;
+            wait(&status);  // Wait for each child
+            printf("Child %d exited with status %d\n", i, WEXITSTATUS(status));  // Print exit status
+        }
+    }
+
+    return 0;
+}
