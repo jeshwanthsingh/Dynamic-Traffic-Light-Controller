@@ -1,4 +1,9 @@
-
+* Description::
+* This program is a simple shell that reads user commands 
+* and executes them. It supports multiple commands separated 
+* by pipes and forks child processes to handle each command.
+* The shell exits when "exit" is typed or when EOF is reached.
+**************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
