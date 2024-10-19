@@ -1,189 +1,111 @@
+
+
 /**************************************************************
-* Class::  CSC-415-01 Fall 2024
-* Name:: [Your Name]
-* Student ID:: [Your Student ID]
-* GitHub-Name:: [Your GitHub Username]
-* Project:: Assignment 5 – Buffered I/O read
+* Class::  CSC-415-0# Spring 2024
+* Name:: <Your Name>
+* Student IDs:: <Your ID>
+* GitHub-Name:: <Your GitHub Username>
+* Group-Name:: <Your Group Name>
+* Project:: Basic File System
 *
-* File:: b_io.c
-*
-* Description:: This file implements the functions to open, read, 
-*               and close files using buffered I/O in chunks of 
-*               B_CHUNK_SIZE. 
-*
+* Description:: This program defines the Volume Control Block (VCB),
+*               Directory Entry structure, and implements bitmap-based 
+*               free space management. It demonstrates basic operations 
+*               such as initialization and printing of metadata.
 **************************************************************/
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include "b_io.h"
-#include "fsLowSmall.h"
+#include <stdio.h>    // For standard input/output functions
+#include <stdint.h>   // For fixed-width integer types
+#include <time.h>     // For time-related functions
 
-#define MAXFCBS 20          // The maximum number of files open at one time
-#define B_CHUNK_SIZE 512     // Size of buffer for file reads
+// ---- Volume Control Block (VCB) ----
+#define MAX_VOLUME_NAME 32  // Maximum length for volume name
 
-// This structure is all the information needed to maintain an open file
-typedef struct b_fcb
-{
-    fileInfo *fi;        // Holds low-level system's file info
-    char *buffer;        // Buffer for reading file data
-    int buf_index;       // Position in the buffer
-    int buf_remain;      // Remaining bytes in the buffer
-    int block_count;     // Number of blocks read from the file
-    int file_index;      // Current byte index in the file
-} b_fcb;
+typedef struct volumeControlBlock {
+    char volumeName[MAX_VOLUME_NAME];  // Name of the volume
+    uint32_t totalBlocks;              // Total number of blocks in the volume
+    uint32_t blockSize;                // Size of each block in bytes
+    uint32_t freeBlocks;               // Number of free blocks available
+    uint32_t rootDirectory;            // Block where the root directory starts
+    long signature;                    // Signature for identification
+} volumeControlBlock;
 
-// Static array of file control blocks
-b_fcb fcbArray[MAXFCBS];
+// ---- Directory Entry Structure ----
+#define NAMESIZELIMIT 20  // Maximum length for file/directory names
 
-// Indicates that the file control block array has not been initialized
-int startup = 0;	
+typedef struct directoryEntry {
+    char name[NAMESIZELIMIT];  // Name of the directory or file
+    int size;                  // Size of the entry in bytes
+    int location;              // Location of the entry on disk (block number)
+    int isFile;                // 0 = directory, 1 = file
+    time_t timeCreated;        // Time when the entry was created
+} directoryEntry;
 
-// Method to initialize the file system / file control blocks
-void b_init()
-{
-    if (startup) 
-        return;  // Already initialized
+// ---- Bitmap for Free Space Management ----
+#define BLOCK_COUNT 100  // Total number of blocks in the volume
+unsigned char bitmap[BLOCK_COUNT / 8] = {0};  // Bitmap with 100 bits (12.5 bytes)
 
-    // Initialize fcbArray to mark all FCBs as free
-    for (int i = 0; i < MAXFCBS; i++)
-    {
-        fcbArray[i].fi = NULL; // Indicates a free FCB
-    }
-    
-    startup = 1;
+// Function to mark a block as used (set bit to 1)
+void setBit(int blockIndex) {
+    bitmap[blockIndex / 8] |= (1 << (blockIndex % 8));
 }
 
-// Method to get a free File Control Block (FCB) element
-b_io_fd b_getFCB()
-{
-    for (int i = 0; i < MAXFCBS; i++)
-    {
-        if (fcbArray[i].fi == NULL)  // Free FCB found
-        {
-            fcbArray[i].fi = (fileInfo *)-2; // Mark as in use
-            return i;  // Return the free FCB index
-        }
-    }
-    return -1;  // All FCBs in use
+// Function to mark a block as free (set bit to 0)
+void clearBit(int blockIndex) {
+    bitmap[blockIndex / 8] &= ~(1 << (blockIndex % 8));
 }
 
-// Function to open a file
-b_io_fd b_open(char *filename, int flags)
-{
-    if (startup == 0) 
-        b_init();  // Initialize system if needed
-
-    // Get file info using GetFileInfo
-    fileInfo *info = GetFileInfo(filename);
-    if (info == NULL)
-    {
-        // File not found
-        return -1;
-    }
-
-    // Get a free FCB
-    b_io_fd fd = b_getFCB();
-    if (fd == -1)
-    {
-        // No free FCB available
-        return -1;
-    }
-
-    // Allocate buffer for reading (512 bytes per chunk)
-    char *buffer = malloc(B_CHUNK_SIZE);
-    if (buffer == NULL)
-    {
-        // Memory allocation failed
-        return -1;
-    }
-
-    // Initialize FCB with file info and buffer
-    fcbArray[fd].fi = info;
-    fcbArray[fd].buffer = buffer;
-    fcbArray[fd].buf_index = 0;
-    fcbArray[fd].buf_remain = 0;
-    fcbArray[fd].block_count = 0;
-    fcbArray[fd].file_index = 0;
-
-    // Return file descriptor
-    return fd;
+// Function to check if a block is used (returns 1 if used, 0 if free)
+int isBlockUsed(int blockIndex) {
+    return (bitmap[blockIndex / 8] & (1 << (blockIndex % 8))) != 0;
 }
 
-// Function to read data from the file
-int b_read(b_io_fd fd, char *buffer, int count)
-{
-    if (startup == 0) 
-        b_init();  // Ensure system initialization
+int main() {
+    // Initialize a VCB (Volume Control Block)
+    volumeControlBlock vcb = {
+        .volumeName = "MyVolume",
+        .totalBlocks = BLOCK_COUNT,
+        .blockSize = 512,
+        .freeBlocks = BLOCK_COUNT,
+        .rootDirectory = 0,
+        .signature = 0x12345678  // Example signature
+    };
 
-    // Validate file descriptor
-    if (fd < 0 || fd >= MAXFCBS || fcbArray[fd].fi == NULL)
-    {
-        return -1;  // Invalid file descriptor
-    }
+    // Print VCB information
+    printf("Volume Control Block (VCB):\n");
+    printf("Volume Name: %s\n", vcb.volumeName);
+    printf("Total Blocks: %u\n", vcb.totalBlocks);
+    printf("Block Size: %u bytes\n", vcb.blockSize);
+    printf("Free Blocks: %u\n", vcb.freeBlocks);
+    printf("Root Directory Block: %u\n", vcb.rootDirectory);
+    printf("Signature: %lx\n\n", vcb.signature);
 
-    b_fcb *fcb = &fcbArray[fd];  // Get the FCB for the file
-    int bytes_read = 0;          // Track the number of bytes read
+    // Initialize a directory entry for the root directory
+    directoryEntry root = {
+        .name = "root",
+        .size = 0,
+        .location = 0,
+        .isFile = 0,  // 0 indicates it's a directory
+        .timeCreated = time(NULL)  // Current time as creation time
+    };
 
-    // Ensure we don't read beyond the file size
-    if (fcb->file_index + count > fcb->fi->fileSize)
-    {
-        count = fcb->fi->fileSize - fcb->file_index;
-    }
+    // Print Directory Entry information
+    printf("Directory Entry:\n");
+    printf("Name: %s\n", root.name);
+    printf("Size: %d bytes\n", root.size);
+    printf("Location: Block %d\n", root.location);
+    printf("Type: %s\n", root.isFile ? "File" : "Directory");
+    printf("Created: %s\n", ctime(&root.timeCreated));  // Print creation time
 
-    // While there are bytes left to read
-    while (count > 0)
-    {
-        // If buffer is empty, read new data from the file
-        if (fcb->buf_remain == 0)
-        {
-            int blocks_read = LBAread(fcb->buffer, 1, fcb->fi->location + fcb->block_count);
-            if (blocks_read == 0)
-            {
-                // End of file reached
-                return bytes_read;
-            }
-            fcb->block_count++;
-            fcb->buf_index = 0;
-            fcb->buf_remain = B_CHUNK_SIZE;
-        }
+    // Demonstrate free space management with bitmap
+    printf("\nAllocating block 5...\n");
+    setBit(5);  // Mark block 5 as used
+    printf("Block 5 used? %d\n", isBlockUsed(5));  // Should print 1 (used)
 
-        // Copy data from buffer to user's buffer
-        int bytes_to_copy = (count < fcb->buf_remain) ? count : fcb->buf_remain;
-        memcpy(buffer + bytes_read, fcb->buffer + fcb->buf_index, bytes_to_copy);
+    printf("Freeing block 5...\n");
+    clearBit(5);  // Mark block 5 as free
+    printf("Block 5 used? %d\n", isBlockUsed(5));  // Should print 0 (free)
 
-        // Update pointers and counters
-        bytes_read += bytes_to_copy;
-        fcb->buf_index += bytes_to_copy;
-        fcb->buf_remain -= bytes_to_copy;
-        count -= bytes_to_copy;
-    }
-
-    // Update file position
-    fcb->file_index += bytes_read;
-    return bytes_read;
+    return 0;
 }
-
-// Function to close the file and release resources
-int b_close(b_io_fd fd)
-{
-    // Validate file descriptor
-    if (fd < 0 || fd >= MAXFCBS || fcbArray[fd].fi == NULL)
-    {
-        return -1;  // Invalid file descriptor
-    }
-
-    // Free the buffer
-    free(fcbArray[fd].buffer);
-    fcbArray[fd].buffer = NULL;
-
-    // Mark FCB as free
-    fcbArray[fd].fi = NULL;
-
-    return 0;  // Success
-}
-
-
 
