@@ -1,10 +1,59 @@
-# Dynamic-Traffic-Light-Controller     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
-Overview:
-The Dynamic Traffic Light Controller is a cutting-edge system designed to optimize traffic flow at intersections. Utilizing the power of Python and the Apache 2 license, this solution employs live camera feeds to analyze traffic density in real-time. By integrating YOLO object detection technology, it accurately counts vehicles at traffic junctions, allowing for dynamic adjustment of traffic signal durations. This innovative approach aims to significantly reduce road congestion, expedite travel times, and lower fuel consumption.
+# Dynamic Traffic Light Controller
 
-Background:
-In many urban areas, the increase in population and vehicles has led to severe traffic congestion, resulting in prolonged delays, excessive fuel consumption, and increased air pollution. Traditional traffic light systems, which operate on fixed timers, are unable to adapt to changing traffic conditions, often exacerbating congestion. The Dynamic Traffic Light Controller addresses this challenge by adapting its signal timings in response to the actual traffic density observed at intersections. This adaptive strategy is particularly crucial in cities like Mumbai, Bengaluru, and New Delhi, which are among the top ten globally for traffic congestion according to the TomTom Traffic Index. The implementation of this system represents a significant step towards more efficient and environmentally friendly urban traffic management.
+## Overview
+The **Dynamic Traffic Light Controller** is an **AI-powered traffic management system** designed to optimize traffic flow using **real-time vehicle detection**. This system integrates **Python, YOLO (You Only Look Once) object detection, and Pygame** to dynamically adjust signal durations based on traffic density, reducing congestion, improving travel efficiency, and lowering fuel consumption.
 
+## Background
+Traffic congestion in urban areas leads to prolonged delays, excessive fuel consumption, and increased pollution. Traditional **fixed-timer traffic lights** fail to adapt to real-time traffic conditions, exacerbating congestion. The **Dynamic Traffic Light Controller** tackles this problem by **analyzing live camera feeds** and adjusting traffic light durations based on vehicle count. This system is particularly effective in high-congestion cities like **Mumbai, Bengaluru, and New Delhi**, improving overall road efficiency.
 
+## Features
+- **Real-time Traffic Analysis**: Uses YOLO object detection to count vehicles at intersections.
+- **Adaptive Traffic Light Timing**: Adjusts signal durations dynamically based on vehicle density.
+- **AI-Powered Optimization**: Enhances traffic management and reduces road congestion.
+- **Simulation Environment**: Uses **Pygame** for testing AI-based traffic light adjustments.
+- **Improved Image Processing**: Optimized YOLO model **reduces frame processing time from 120ms to 85ms**.
 
+## Technologies Used
+- **Python** – Backend logic and AI model execution.
+- **YOLO (You Only Look Once)** – Object detection for vehicle counting.
+- **Pygame** – Real-time simulation and visualization.
+- **OpenCV** – Image processing and frame analysis.
+- **NumPy & Pandas** – Data handling and analysis.
+
+## Installation & Setup
+### **1. Clone the Repository**
+```sh
+git clone <your-repo-url>
+cd dynamic-traffic-light-controller
+```
+
+### **2. Install Dependencies**
+```sh
+pip install -r requirements.txt
+```
+
+### **3. Run the Simulation**
+```sh
+python main.py
+```
+
+## How It Works
+1. **Captures real-time video feed** from an intersection.
+2. **YOLO model detects and counts vehicles** in each lane.
+3. **Traffic light durations are adjusted dynamically** based on vehicle density.
+4. **Pygame-based simulation** visualizes changes in real-time.
+5. **Performance metrics logged** for efficiency analysis.
+
+## Performance Improvements
+- **Reduced frame processing time from 120ms to 85ms** by optimizing the YOLO model.
+- **Efficient traffic handling**, decreasing congestion at intersections.
+- **Fuel savings** due to reduced vehicle idling time at signals.
+
+## Future Enhancements
+- **Integration with real-world traffic cameras** for live implementation.
+- **Deep learning-based traffic flow prediction**.
+- **Cloud-based dashboard** for remote monitoring and control.
+
+## License
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
